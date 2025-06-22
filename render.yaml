@@ -5,6 +5,7 @@ services:
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn wsgi:app"
     rootDir: backend
+    plan: free  # or starter, standard — adjust as needed
     envVars:
       - key: SECRET_KEY
         value: your-secret
@@ -12,8 +13,12 @@ services:
         value: your-token
       - key: TELEGRAM_CHAT_ID
         value: your-chat-id
+
   - type: static
     name: trading-frontend
     buildCommand: "npm install && npm run build"
     staticPublishPath: dist
     rootDir: frontend
+    envVars:
+      - key: VITE_API_URL
+        value: https://trading-hsmu.onrender.com 
