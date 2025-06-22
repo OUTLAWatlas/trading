@@ -14,7 +14,7 @@ services:
       - key: TELEGRAM_CHAT_ID
         value: your-chat-id
 
-  - type: static
+  - type: web
     name: trading-frontend
     buildCommand: "npm install && npm run build"
     staticPublishPath: dist
