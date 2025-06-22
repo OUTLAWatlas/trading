@@ -1,91 +1,97 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { createChart } from 'lightweight-charts';
-import axios from 'axios';
+import React, { useEffect, useState } from "react";
+import {
+  createChart
+} from "lightweight-charts";
+import axios from "axios";
 
 export default function Dashboard() {
-  const chartRef = useRef(null);
-  const chartInstance = useRef(null);
   const [price, setPrice] = useState(0);
-  const [pattern, setPattern] = useState('None');
+  const [pattern, setPattern] = useState("None");
   const [confidence, setConfidence] = useState(0);
+  const [chart, setChart] = useState(null);
+  const [candlestickSeries, setCandlestickSeries] = useState(null);
+  const [timeframe, setTimeframe] = useState("1m");
 
   useEffect(() => {
-    if (chartRef.current && !chartInstance.current) {
-      chartInstance.current = createChart(chartRef.current, {
-        width: chartRef.current.clientWidth,
-        height: 400,
-        layout: {
-          background: { color: '#000000' },
-          textColor: '#FFFFFF',
-        },
-        grid: {
-          vertLines: { color: '#444' },
-          horzLines: { color: '#444' },
-        },
-        crosshair: {
-          mode: 0,
-        },
-        rightPriceScale: {
-          borderColor: '#666',
-        },
-        timeScale: {
-          borderColor: '#666',
-        },
-      });
+    const chartInstance = createChart(document.getElementById("chart"), {
+      width: window.innerWidth * 0.75,
+      height: 400,
+      layout: {
+        background: { color: "#111827" },
+        textColor: "#F9FAFB"
+      },
+      grid: {
+        vertLines: { color: "#374151" },
+        horzLines: { color: "#374151" }
+      },
+    });
+    const series = chartInstance.addCandlestickSeries();
+    setChart(chartInstance);
+    setCandlestickSeries(series);
 
-      const candleSeries = chartInstance.current.addCandlestickSeries({
-        upColor: '#26a69a',
-        downColor: '#ef5350',
-        borderVisible: false,
-        wickUpColor: '#26a69a',
-        wickDownColor: '#ef5350',
-      });
+    window.addEventListener("resize", () => {
+      chartInstance.applyOptions({ width: window.innerWidth * 0.75 });
+    });
 
-      // Dummy data
-      candleSeries.setData([
-        { time: '2024-06-20', open: 3400, high: 3420, low: 3380, close: 3395 },
-        { time: '2024-06-21', open: 3395, high: 3410, low: 3375, close: 3385 },
-        { time: '2024-06-22', open: 3385, high: 3405, low: 3365, close: 3390 },
-      ]);
-
-      // Optionally fetch real data here
-      // fetchChartData(candleSeries);
-    }
-
-    const handleResize = () => {
-      chartInstance.current?.applyOptions({
-        width: chartRef.current.clientWidth,
-      });
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => chartInstance.remove();
   }, []);
 
-  // Example API poll
   useEffect(() => {
-    const interval = setInterval(() => {
-      axios.get('/api/data') // Update to your backend endpoint
-        .then(res => {
-          setPrice(res.data.price);
-          setPattern(res.data.pattern);
-          setConfidence(res.data.confidence);
-        })
-        .catch(() => {
-          setPrice(3396.4);
-          setPattern('None');
-          setConfidence(0);
-        });
-    }, 5000);
+    fetchData();
+    const interval = setInterval(fetchData, 10000); // auto-refresh every 10s
     return () => clearInterval(interval);
-  }, []);
+  }, [timeframe]);
+
+  const fetchData = async () => {
+    try {
+      const res = await axios.get("https://trading-backend-v84g.onrender.com/data/latest");
+      setPrice(res.data.price);
+      setPattern(res.data.pattern);
+      setConfidence(res.data.confidence);
+      
+      const ohlc = res.data.ohlc.map((item, idx) => ({
+        time: idx + 1,
+        open: item.open,
+        high: item.high,
+        low: item.low,
+        close: item.close,
+      }));
+
+      candlestickSeries && candlestickSeries.setData(ohlc);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-black text-white p-4">
-      <h1 className="text-3xl font-bold mb-4">Trading Dashboard</h1>
-      <div ref={chartRef} className="w-full mb-4" />
-      <div className="bg-gray-900 p-4 rounded-lg shadow-lg">
-        <p>💰 <span className="font-bold">Price:</span> {price.toFixed(2)}</p>
-        <p>📊 <span className="font-bold">Pattern:</span> {pattern} (<span className="font-bold">{confidence}%</span> confidence)</p>
+    <div className="bg-gray-900 min-h-screen text-gray-100 p-4">
+      <h1 className="text-3xl font-bold mb-4">📈 Trading Dashboard</h1>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="lg:col-span-3 bg-gray-800 rounded-lg shadow p-2">
+          <div id="chart"></div>
+        </div>
+        <div className="bg-gray-800 rounded-lg shadow p-4">
+          <div className="text-xl mb-2">💰 Price: {price.toFixed(2)}</div>
+          <div className="text-lg mb-2">📊 Pattern: {pattern} ({confidence}% confidence)</div>
+          <div className="mt-4">
+            <button
+              className="bg-blue-600 rounded px-3 py-1 mr-2 hover:bg-blue-700"
+              onClick={fetchData}
+            >
+              🔄 Refresh
+            </button>
+            <select
+              className="bg-gray-700 rounded px-2 py-1"
+              value={timeframe}
+              onChange={(e) => setTimeframe(e.target.value)}
+            >
+              <option value="1m">1m</option>
+              <option value="5m">5m</option>
+              <option value="15m">15m</option>
+              <option value="1h">1h</option>
+            </select>
+          </div>
+        </div>
       </div>
     </div>
   );
